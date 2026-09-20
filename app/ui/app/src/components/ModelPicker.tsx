@@ -15,6 +15,18 @@ import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 
 const stalenessCheckCache = new Map<string, number>();
 
+export function modelGroup(model: Model): string {
+  if (model.kind === "router") return "Roteamento inteligente";
+  if (model.kind === "remote") return model.provider || "APIs externas";
+  return "Modelos locais";
+}
+
+function selectableModelIndexes(models: Model[]): number[] {
+  return models.flatMap((model, index) =>
+    model.available === false ? [] : [index],
+  );
+}
+
 export const ModelPicker = forwardRef<
   HTMLButtonElement,
   {
@@ -47,6 +59,8 @@ export const ModelPicker = forwardRef<
     if (
       !model ||
       !model.model ||
+      model.kind === "remote" ||
+      model.kind === "router" ||
       model.digest === undefined ||
       model.digest === ""
     )
@@ -134,6 +148,7 @@ export const ModelPicker = forwardRef<
   }, [isOpen, onEscape]);
 
   const handleModelSelect = (model: Model) => {
+    if (model.available === false) return;
     setSettings({ SelectedModel: model.model });
     setIsOpen(false);
     onModelSelect?.();
@@ -248,11 +263,16 @@ export const ModelList = forwardRef(function ModelList(
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen || models.length === 0) return;
 
+      const selectable = selectableModelIndexes(models);
+      if (selectable.length === 0) return;
+      const currentPosition = selectable.indexOf(highlightedIndex);
+
       switch (event.key) {
         case "ArrowDown":
           event.preventDefault();
           setHighlightedIndex((prev) => {
-            const next = prev < models.length - 1 ? prev + 1 : 0;
+            const position = selectable.indexOf(prev);
+            const next = selectable[(position + 1) % selectable.length];
             scrollToItem(next);
             return next;
           });
@@ -260,14 +280,21 @@ export const ModelList = forwardRef(function ModelList(
         case "ArrowUp":
           event.preventDefault();
           setHighlightedIndex((prev) => {
-            const next = prev > 0 ? prev - 1 : models.length - 1;
+            const position = selectable.indexOf(prev);
+            const next =
+              position <= 0
+                ? selectable[selectable.length - 1]
+                : selectable[position - 1];
             scrollToItem(next);
             return next;
           });
           break;
         case "Enter":
           event.preventDefault();
-          if (highlightedIndex >= 0 && highlightedIndex < models.length) {
+          if (
+            currentPosition >= 0 &&
+            models[highlightedIndex]?.available !== false
+          ) {
             onModelSelect(models[highlightedIndex]);
           }
           break;
@@ -305,12 +332,31 @@ export const ModelList = forwardRef(function ModelList(
         </div>
       ) : (
         models.map((model, index) => {
+          const group = modelGroup(model);
+          const previousGroup = index > 0 ? modelGroup(models[index - 1]) : "";
+          const unavailable = model.available === false;
           return (
             <div key={`${model.model}-${model.digest || "no-digest"}-${index}`}>
+              {group !== previousGroup && (
+                <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  {group}
+                </div>
+              )}
               <button
+                type="button"
+                disabled={unavailable}
                 onClick={() => onModelSelect(model)}
-                onMouseEnter={() => setHighlightedIndex(index)}
-                className={`flex w-full items-center gap-2 px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/60 focus:outline-none cursor-pointer ${
+                onMouseEnter={() => !unavailable && setHighlightedIndex(index)}
+                title={
+                  unavailable
+                    ? "Configure a credencial deste provedor para usar o modelo"
+                    : undefined
+                }
+                className={`flex w-full items-center gap-2 px-3 py-2 focus:outline-none ${
+                  unavailable
+                    ? "cursor-not-allowed opacity-45"
+                    : "cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-700/60"
+                } ${
                   highlightedIndex === index ||
                   selectedModel?.model === model.model
                     ? "bg-neutral-100 dark:bg-neutral-700/60"
@@ -320,6 +366,11 @@ export const ModelList = forwardRef(function ModelList(
                 <span className="flex-1 text-left truncate min-w-0">
                   {model.model}
                 </span>
+                {model.kind === "remote" && (
+                  <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                    {unavailable ? "sem chave" : "API"}
+                  </span>
+                )}
                 {model.isCloud() && (
                   <svg
                     className="h-3 fill-current text-neutral-500 dark:text-neutral-400"

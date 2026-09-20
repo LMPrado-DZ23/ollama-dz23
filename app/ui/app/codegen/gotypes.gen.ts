@@ -217,12 +217,20 @@ export class Model {
     model: string;
     digest?: string;
     modified_at?: Time;
+    kind?: string;
+    provider?: string;
+    available: boolean;
+    capabilities?: string[];
 
     constructor(source: any = {}) {
         if ('string' === typeof source) source = JSON.parse(source);
         this.model = source["model"];
         this.digest = source["digest"];
         this.modified_at = this.convertValues(source["modified_at"], Time);
+        this.kind = source["kind"];
+        this.provider = source["provider"];
+        this.available = source["available"];
+        this.capabilities = source["capabilities"];
     }
 
 	convertValues(a: any, classs: any, asMap: boolean = false): any {

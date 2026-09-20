@@ -104,6 +104,10 @@ curl http://localhost:11434/api/chat -d '{
 
 See the [API documentation](https://docs.ollama.com/api) for all endpoints.
 
+### DZ23 multi-provider mode
+
+This fork can expose explicitly configured API and CLI providers beside local models through the same Ollama and OpenAI-compatible endpoints. The feature is disabled by default. See [Ollama DZ23 multi-provider mode](docs/dz23-multi-provider.md) for configuration, security boundaries, and the built-in CLI/agent catalog.
+
 ### Python
 
 ```

@@ -6,9 +6,82 @@ vi.mock("./lib/ollama-client", () => ({
 
 import {
   fetchConnectUrl,
+  getModels,
   getClaudeDesktopAvailableModels,
   getIntegrationStatuses,
 } from "./api";
+
+describe("getModels", () => {
+  afterEach(() => listModels.mockReset());
+
+  it("preserves DZ23 provider metadata for remote and routed models", async () => {
+    listModels.mockResolvedValue({
+      models: [
+        {
+          name: "qwen3:8b",
+          digest: "sha256:local",
+          details: { format: "gguf", family: "qwen" },
+        },
+        {
+          name: "groq/llama",
+          digest: "remote:groq",
+          details: { format: "remote", family: "groq" },
+          capabilities: ["chat", "coding"],
+        },
+        {
+          name: "deepseek/chat",
+          digest: "remote:deepseek",
+          details: { format: "remote", family: "deepseek-unavailable" },
+        },
+        {
+          name: "auto/coding",
+          digest: "virtual:dz23",
+          details: { format: "virtual", family: "dz23-router" },
+        },
+      ],
+    });
+
+    const models = await getModels();
+    expect(
+      models.map((model) => ({
+        model: model.model,
+        kind: model.kind,
+        provider: model.provider,
+        available: model.available,
+        capabilities: model.capabilities,
+      })),
+    ).toEqual([
+      {
+        model: "qwen3:8b",
+        kind: "local",
+        provider: "Ollama",
+        available: true,
+        capabilities: [],
+      },
+      {
+        model: "groq/llama",
+        kind: "remote",
+        provider: "groq",
+        available: true,
+        capabilities: ["chat", "coding"],
+      },
+      {
+        model: "deepseek/chat",
+        kind: "remote",
+        provider: "deepseek",
+        available: false,
+        capabilities: [],
+      },
+      {
+        model: "auto/coding",
+        kind: "router",
+        provider: "DZ23 Router",
+        available: true,
+        capabilities: [],
+      },
+    ]);
+  });
+});
 
 describe("fetchConnectUrl", () => {
   afterEach(() => {

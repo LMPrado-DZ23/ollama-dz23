@@ -155,10 +155,37 @@ export async function getModels(query?: string): Promise<Model[]> {
         // Remove the latest tag from the returned model
         const modelName = m.name.replace(/:latest$/, "");
 
+        // The generated Ollama client can lag behind fields added by the
+        // server. Keep the extension local so upstream client updates remain
+        // straightforward.
+        const extended = m as ModelResponse & {
+          capabilities?: string[];
+          details?: { format?: string; family?: string };
+        };
+        const family = extended.details?.family || "";
+        const kind =
+          extended.details?.format === "remote"
+            ? "remote"
+            : extended.details?.format === "virtual"
+              ? "router"
+              : "local";
+        const provider =
+          kind === "remote"
+            ? family.replace(/-unavailable$/, "") || modelName.split("/")[0]
+            : kind === "router"
+              ? "DZ23 Router"
+              : "Ollama";
+
         return new Model({
           model: modelName,
           digest: m.digest,
           modified_at: m.modified_at ? new Date(m.modified_at) : undefined,
+          kind,
+          provider,
+          available: !family.endsWith("-unavailable"),
+          capabilities: Array.isArray(extended.capabilities)
+            ? extended.capabilities
+            : [],
         });
       });
 
@@ -244,9 +271,7 @@ export async function getClaudeDesktopAvailableModels(
     const seen = new Set<string>();
     return [...localModels, ...cloudModels]
       .filter((model: ModelResponse) => {
-        const base = model.name
-          .replace(/:latest$/, "")
-          .replace(/:cloud$/, "");
+        const base = model.name.replace(/:latest$/, "").replace(/:cloud$/, "");
         if (!base || seen.has(base)) return false;
 
         const families = model.details?.families;
