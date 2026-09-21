@@ -310,6 +310,9 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 		if err != nil {
 			return errors.New("native chat request requires messages")
 		}
+		if err := g.restoreToolMetadata(provider, model, messages); err != nil {
+			return err
+		}
 		request["messages"] = messages
 		for _, field := range []string{"tools", "format"} {
 			if raw := envelope[field]; len(raw) > 0 {
@@ -349,7 +352,7 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 	}
 	if stream {
 		c.Header("Content-Type", "application/x-ndjson")
-		return translateChatStream(c, resp.Body, model.ID, c.Request.URL.Path)
+		return translateChatStream(c, resp.Body, model.ID, c.Request.URL.Path, func(calls json.RawMessage) error { return g.rememberToolMetadata(provider, model, calls) })
 	}
 	var completion struct {
 		Choices []struct {
@@ -374,6 +377,9 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 		return errors.New("provider response contained no choices")
 	}
 	choice := completion.Choices[0]
+	if err := g.rememberToolMetadata(provider, model, choice.Message.ToolCalls); err != nil {
+		return err
+	}
 	c.Header("Content-Type", "application/json")
 	writeNativeChunk(c, model.ID, c.Request.URL.Path, choice.Message.Content, choice.Message.ToolCalls, true, choice.FinishReason, false)
 	return nil
@@ -473,7 +479,7 @@ func pinnedProviderTransport(source http.RoundTripper, approved []net.IP) (http.
 	return transport, nil
 }
 
-func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath string) error {
+func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath string, recordTools ...func(json.RawMessage) error) error {
 	scanner := bufio.NewScanner(&boundedReader{reader: body, remaining: maxResponseBytes})
 	buffer := make([]byte, 64<<10)
 	scanner.Buffer(buffer, maxResponseBytes)
@@ -510,6 +516,11 @@ func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath str
 		var completedCalls json.RawMessage
 		if done {
 			completedCalls = normalizedAccumulatedToolCalls(toolCalls)
+			for _, record := range recordTools {
+				if err := record(completedCalls); err != nil {
+					return err
+				}
+			}
 		}
 		writeNativeChunk(c, modelID, nativePath, choice.Delta.Content, completedCalls, done, choice.FinishReason, true)
 		if flusher, ok := c.Writer.(http.Flusher); ok {
@@ -554,10 +565,11 @@ func writeNativeChunk(c *gin.Context, modelID, nativePath, content string, toolC
 }
 
 type openAIToolCall struct {
-	Index    int    `json:"index,omitempty"`
-	ID       string `json:"id,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Function struct {
+	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
+	Index        int             `json:"index,omitempty"`
+	ID           string          `json:"id,omitempty"`
+	Type         string          `json:"type,omitempty"`
+	Function     struct {
 		Name      string `json:"name,omitempty"`
 		Arguments string `json:"arguments,omitempty"`
 	} `json:"function"`
@@ -647,6 +659,9 @@ func accumulateOpenAIToolCalls(accumulator map[int]*openAIToolCall, raw json.Raw
 		}
 		if chunk.ID != "" {
 			call.ID = chunk.ID
+		}
+		if len(chunk.ExtraContent) > 0 {
+			call.ExtraContent = append(json.RawMessage(nil), chunk.ExtraContent...)
 		}
 		if chunk.Type != "" {
 			call.Type = chunk.Type

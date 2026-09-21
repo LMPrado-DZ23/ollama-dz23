@@ -27,3 +27,22 @@ Regression checks: `go test -race ./internal/proxy ./internal/multillm`,
 packages. Live tests must hit the exact Desktop `/api/codex/responses` URL,
 not only the versioned route. Restart the Desktop app after replacing its
 startup-loaded model catalog; changing the router does not require that restart.
+
+## Tool continuation metadata
+
+Some providers, including current Gemini thinking models, return opaque tool
+context in `tool_calls[].extra_content`. Dropping that context can make the
+second request fail even when the first generation and tool call succeeded.
+DZ23 captures this context before native/Responses conversion and restores it
+on the matching assistant tool call in subsequent requests. The cache survives
+server restarts and is bound to provider destination, credential, model, call
+ID, function name and canonical arguments; it never borrows metadata from a
+different provider, model, credential or changed tool call.
+
+The local user cache stores only provider-supplied opaque metadata, not prompts,
+API keys or tool results. On Windows it uses user-bound DPAPI. Cache retention
+is bounded to 30 days, 2,048 records and 32 MiB. A client replay older than the
+retention window may require a new conversation. No dummy signatures or
+signature-validation bypasses are inserted. Codex command approvals and sandbox
+policies remain in force; completing model inference is not proof that a
+particular host command was permitted or executed.
