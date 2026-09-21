@@ -130,3 +130,51 @@ export OPENAI_API_KEY=ollama
 When accessing the gateway from another machine, replace `ollama` with the value of `OLLAMA_DZ23_GATEWAY_KEY` and bind Ollama only to a trusted network interface protected by firewall/TLS.
 
 API prefixes follow the OpenAI client convention: Gemini uses `/v1beta/openai/chat/completions`, without an extra `/v1`. The Gemini sample uses `gemini-flash-latest`; model availability remains account-dependent. Provider errors in native chat are returned as a single safe Ollama error string.
+
+## Synchronize provider catalogs on Windows
+
+The gateway reads `models` from the user configuration at startup. Saving a key
+alone does not discover upstream models. The Windows synchronization utility reads
+existing user/DPAPI credentials and queries the providers' model-list APIs:
+
+```powershell
+python -m pip install -r scripts/requirements-sync.txt
+# Preview; does not modify the catalog or call inference endpoints.
+powershell -File scripts/dz23-sync-models.ps1
+# Apply with an automatic backup and restart the installed Ollama DZ23 app.
+# Finish ongoing inference requests first: restarting interrupts them.
+powershell -File scripts/dz23-sync-models.ps1 -Apply -Restart
+```
+
+A desktop shortcut can invoke the latter command. Synchronization is on demand;
+there is no background task and no polling of provider APIs. Run it again after
+adding credentials or when providers publish new models. It requires Python 3.10+
+and `httpx`; `-Python` selects a specific Python executable.
+
+Supported catalog adapters cover the 19 bundled providers. Ollama Cloud uses
+`https://ollama.com/api/tags`, Gemini uses its native paginated model endpoint,
+Anthropic uses its native paginated model endpoint, and the other providers use
+OpenAI-compatible model lists. Only allowlisted HTTPS hosts receive credentials;
+redirects are rejected. Existing credential names and inference endpoints remain
+unchanged. No credentials are written to reports or repository files.
+
+Each successful catalog is deduplicated and obvious non-chat/inactive models are
+excluded using provider metadata and identifier filters. Unknown capability metadata
+is represented conservatively as chat only. Existing models retain their configured
+capabilities and routing priorities; new models receive low priority so they do not
+replace preferred automatic routes. Listing is **not** a guarantee of inference
+access, tool support, free usage, or account balance. Some providers list public
+models even with an invalid token; the report deliberately sets
+`inference_tested: false` for catalog synchronization.
+
+Failed providers retain their previous catalog and get an explicit status in
+`sync-status.json`. HTTP 401/403 requires checking credentials or provider access;
+the utility does not replace keys or silently switch endpoints. Configuration edits
+made during the fetch cause an abort; updates use a same-directory atomic replace
+and a timestamped backup. Restore that backup and restart Ollama to undo a sync.
+
+Run the focused tests with:
+
+```sh
+python scripts/test_dz23_sync_models.py
+```
