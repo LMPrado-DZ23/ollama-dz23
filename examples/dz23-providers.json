@@ -56,7 +56,7 @@
     },
     {
       "name": "groq", "type": "openai-compatible", "base_url": "https://api.groq.com/openai/v1", "api_key_env": "GROQ_API_KEY", "priority": 75,
-      "models": [{ "id": "llama-3.1-8b-instant", "capabilities": ["chat", "tools", "coding"] }]
+      "models": [{ "id": "openai/gpt-oss-20b", "capabilities": ["chat", "tools", "coding"] }]
     },
     {
       "name": "together", "type": "openai-compatible", "base_url": "https://api.together.xyz/v1", "api_key_env": "TOGETHER_API_KEY", "priority": 55,

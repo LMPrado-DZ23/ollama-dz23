@@ -384,3 +384,44 @@ func TestNativeProviderErrorIsSafeOllamaJSON(t *testing.T) {
 		t.Fatalf("unsafe error %s", rr.Body.String())
 	}
 }
+
+func TestNativeGenerationOptionsReachProvider(t *testing.T) {
+	for _, path := range []string{"/api/chat", "/api/generate"} {
+		for _, limit := range []string{"32", "-1"} {
+			t.Run(path+limit, func(t *testing.T) {
+				var got map[string]json.RawMessage
+				upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+						t.Error(err)
+					}
+					w.Header().Set("Retry-After", "30")
+					w.WriteHeader(http.StatusTooManyRequests)
+				}))
+				defer upstream.Close()
+				g := NewGateway(&Registry{}, upstream.Client())
+				rr := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rr)
+				c.Request = httptest.NewRequest("POST", path, nil)
+				err := g.forwardNative(c, Provider{Name: "test", BaseURL: upstream.URL, AllowPrivate: true}, Model{UpstreamID: "test"}, map[string]json.RawMessage{
+					"messages": json.RawMessage(`[]`),
+					"options":  json.RawMessage(`{"num_predict":` + limit + `,"temperature":0,"top_p":0.8,"seed":42,"stop":["END"]}`),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if limit == "32" && string(got["max_tokens"]) != "32" {
+					t.Fatalf("token cap lost: %s", got["max_tokens"])
+				}
+				if limit == "-1" && got["max_tokens"] != nil {
+					t.Fatal("unlimited token setting forwarded as negative cap")
+				}
+				if string(got["temperature"]) != "0" || string(got["top_p"]) != "0.8" || string(got["seed"]) != "42" || string(got["stop"]) != `["END"]` {
+					t.Fatalf("options lost: %v", got)
+				}
+				if rr.Code != 429 || rr.Header().Get("Retry-After") != "30" {
+					t.Fatal("upstream throttle status/header lost")
+				}
+			})
+		}
+	}
+}

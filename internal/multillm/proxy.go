@@ -260,6 +260,28 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 	request := make(map[string]any)
 	request["model"] = model.UpstreamID
 	request["stream"] = stream
+	// Preserve explicit Ollama generation limits when translating to Chat
+	// Completions. Negative num_predict values mean unlimited, not a token cap.
+	var options map[string]json.RawMessage
+	if raw := envelope["options"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &options); err != nil {
+			return errors.New("invalid generation options")
+		}
+		var limit int
+		if raw := options["num_predict"]; len(raw) > 0 {
+			if err := json.Unmarshal(raw, &limit); err != nil {
+				return errors.New("invalid generation token limit")
+			}
+			if limit > 0 {
+				request["max_tokens"] = limit
+			}
+		}
+		for _, field := range []string{"temperature", "top_p", "seed", "stop"} {
+			if raw := options[field]; len(raw) > 0 {
+				request[field] = raw
+			}
+		}
+	}
 	if c.Request.URL.Path == "/api/generate" {
 		var prompt, system string
 		_ = json.Unmarshal(envelope["prompt"], &prompt)
@@ -305,6 +327,9 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 			message = "provider endpoint or model is unavailable"
 		case 429:
 			message = "provider rate limit or account quota exceeded"
+		}
+		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+			c.Header("Retry-After", retryAfter)
 		}
 		c.JSON(resp.StatusCode, gin.H{"error": fmt.Sprintf("%s: %s (HTTP %d)", provider.Name, message, resp.StatusCode)})
 		return nil

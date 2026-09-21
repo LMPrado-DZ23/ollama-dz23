@@ -41,10 +41,16 @@ jobs:
         run: go test ./app/ui -run TestProviderRoutesRegisterAndRequireAuthentication -count=1
       - name: Build Desktop executable
         run: go build -trimpath -ldflags "-s -w -H windowsgui -X=github.com/ollama/ollama/app/version.Version=0.1.1-dz23" -o dist/windows-ollama-app-amd64.exe ./app/cmd/app/
+      - name: Test and build gateway executable
+        run: |
+          go test ./internal/multillm -count=1
+          go build -trimpath -ldflags "-s -w -X=github.com/ollama/ollama/version.Version=0.1.1-dz23" -o dist/ollama.exe .
       - uses: actions/upload-artifact@v4
         with:
           name: OllamaDZ23Desktop-windows-amd64-unsigned
-          path: dist/windows-ollama-app-amd64.exe
+          path: |
+            dist/windows-ollama-app-amd64.exe
+            dist/ollama.exe
   installer:
     runs-on: windows-latest
     timeout-minutes: 90
