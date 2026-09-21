@@ -1948,7 +1948,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 		cors.New(corsConfig),
 		allowedHostsMiddleware(s.addr),
 	)
-	if configPath := strings.TrimSpace(os.Getenv("OLLAMA_DZ23_CONFIG")); configPath != "" {
+	if configPath := multillm.ConfigPath(); configPath != "" {
 		registry, err := multillm.Load(configPath)
 		if err != nil {
 			return nil, err

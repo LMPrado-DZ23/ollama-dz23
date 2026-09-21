@@ -55,3 +55,25 @@ func decodeCredentialFile(path string, raw []byte) (string, error) {
 	}
 	return string(append([]byte(nil), plaintext...)), nil
 }
+
+const managedCredentialExtension = ".dpapi"
+
+func encodeCredentialFile(value string) ([]byte, error) {
+	// Match PowerShell ConvertFrom-SecureString: DPAPI over UTF-16LE, hex encoded.
+	units := utf16.Encode([]rune(value))
+	plaintext := make([]byte, len(units)*2)
+	for i, unit := range units {
+		binary.LittleEndian.PutUint16(plaintext[i*2:], unit)
+	}
+	defer clear(plaintext)
+	in := dataBlob{size: uint32(len(plaintext)), data: &plaintext[0]}
+	var out dataBlob
+	result, _, err := windows.NewLazySystemDLL("crypt32.dll").NewProc("CryptProtectData").Call(
+		uintptr(unsafe.Pointer(&in)), 0, 0, 0, 0, 1, uintptr(unsafe.Pointer(&out)),
+	)
+	if result == 0 {
+		return nil, err
+	}
+	defer windows.LocalFree(windows.Handle(uintptr(unsafe.Pointer(out.data))))
+	return []byte(hex.EncodeToString(unsafe.Slice(out.data, out.size))), nil
+}

@@ -113,7 +113,11 @@ Source: ".\assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\examples\dz23-providers.json"; DestDir: "{userappdata}\Ollama DZ23"; DestName: "dz23-providers.json"; Flags: onlyifdoesntexist
 Source: "..\scripts\dz23-configure.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
+[Tasks]
+Name: "autostart"; Description: "Iniciar Ollama DZ23 ao entrar no Windows"; Flags: checkedonce
+
 [Icons]
+Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart; IconFilename: "{app}\app.ico"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
 Name: "{app}\lib\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
 Name: "{userprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"

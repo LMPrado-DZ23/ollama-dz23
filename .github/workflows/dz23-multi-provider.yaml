@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/dz23-multi-provider-foundation
+      - fix/windows-provider-settings
   pull_request:
     paths:
       - 'internal/multillm/**'
@@ -44,5 +45,5 @@ jobs:
         working-directory: app/ui/app
         run: |
           npm ci
-          npm test -- --run src/api.test.ts src/components/ModelPicker.test.ts
+          npm test -- --run src/api.test.ts src/components/ModelPicker.test.ts src/components/ProviderSettings.test.tsx src/components/Settings.interaction.test.tsx
           npm run build

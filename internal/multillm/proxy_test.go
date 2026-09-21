@@ -332,3 +332,55 @@ func TestAnthropicProviderTranslatesNativeChat(t *testing.T) {
 		t.Fatalf("status=%d path=%q model=%q system=%q body=%s", recorder.Code, gotPath, gotModel, gotSystem, recorder.Body.String())
 	}
 }
+
+func TestProviderBaseURLPrefixes(t *testing.T) {
+	for _, tc := range []struct{ prefix, want string }{
+		{"", "/v1/chat/completions"},
+		{"/v1", "/v1/chat/completions"},
+		{"/v1/", "/v1/chat/completions"},
+		{"/v1beta/openai", "/v1beta/openai/chat/completions"},
+		{"/v1beta/openai/", "/v1beta/openai/chat/completions"},
+		{"/compatible-mode/v1", "/compatible-mode/v1/chat/completions"},
+		{"/api/v1", "/api/v1/chat/completions"},
+	} {
+		t.Run(tc.prefix, func(t *testing.T) {
+			var got string
+			upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r.URL.Path; w.Write([]byte(`{}`)) }))
+			defer upstream.Close()
+			g := NewGateway(&Registry{}, upstream.Client())
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/api/chat", nil)
+			resp, err := g.doProviderRequest(c, Provider{BaseURL: upstream.URL + tc.prefix, AllowPrivate: true}, "/v1/chat/completions", []byte(`{}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if got != tc.want {
+				t.Fatalf("path=%q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNativeProviderErrorIsSafeOllamaJSON(t *testing.T) {
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		w.Write([]byte("[{\n\"secret\":\"do-not-echo\"}]"))
+	}))
+	defer upstream.Close()
+	g := NewGateway(&Registry{}, upstream.Client())
+	rr := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rr)
+	c.Request = httptest.NewRequest("POST", "/api/chat", nil)
+	err := g.forwardNative(c, Provider{Name: "gemini", BaseURL: upstream.URL + "/v1beta/openai", AllowPrivate: true}, Model{ID: "gemini/test", UpstreamID: "test"}, map[string]json.RawMessage{"messages": json.RawMessage(`[]`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if rr.Code != 404 || !strings.Contains(result["error"], "gemini") || strings.Contains(rr.Body.String(), "do-not-echo") {
+		t.Fatalf("unsafe error %s", rr.Body.String())
+	}
+}

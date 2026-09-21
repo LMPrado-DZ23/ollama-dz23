@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feat/dz23-multi-provider-foundation
+      - fix/windows-provider-settings
     paths:
       - 'app/**'
       - 'cmd/**'
@@ -36,7 +37,7 @@ jobs:
       - name: Build CPU runtime, Desktop, and installer
         shell: pwsh
         env:
-          VERSION: 0.1.0-dz23
+          VERSION: 0.1.1-dz23
         run: ./scripts/build_windows.ps1 cpu ollama app installer
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4

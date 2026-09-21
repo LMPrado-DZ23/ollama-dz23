@@ -2,6 +2,34 @@
 
 Multi-provider mode is opt-in and keeps the original Ollama local runtime unchanged. It adds remote models to the same Ollama and OpenAI-compatible listener used by local models. The DZ23 Desktop selector groups local models, automatic routes, and each configured API provider; entries without a credential remain visible but disabled.
 
+## Desktop: configure API keys
+
+Open **Settings → Provedores e chaves de API**, choose a provider, paste the key,
+and select **Salvar chave**. Existing keys are never returned to the browser.
+The provider list distinguishes missing, saved (not yet verified), disabled, and
+externally managed credentials. Keys saved here take effect without restarting
+inference. The Windows store uses current-user DPAPI; other platforms use
+owner-only credential files. Keys from the Windows configurator can also be edited here. Other environment overrides retain precedence and cannot
+be silently replaced from this screen.
+
+The credential endpoint belongs only to the desktop server, requires the desktop
+session token, rejects non-loopback and cross-origin requests, and is never
+registered on the public inference listener. Saving a key does not validate an
+account or make a paid API call. Verify a provider with a normal chat request.
+
+Windows installations automatically discover the installer-owned provider config
+when the launching terminal has a stale environment. An explicit
+`OLLAMA_DZ23_CONFIG` still wins. The installer offers startup at Windows sign-in.
+
+## Codex connection recovery
+
+Adding Ollama models to the regular Codex/ChatGPT profile routes that profile
+through the local Ollama service. Keep Ollama running while that integration is
+active. To return to the original connection, use
+`ollama launch chatgpt --restore` and restart Codex. Do not delete authentication
+or conversation databases to fix a stopped local proxy. The separate Codex CLI
+profile remains available for intentional Ollama sessions.
+
 ## Enable
 
 Copy `examples/dz23-providers.json`, choose the exact model identifiers offered by your accounts, and set only the credentials you intend to use:
@@ -100,3 +128,5 @@ export OPENAI_API_KEY=ollama
 ```
 
 When accessing the gateway from another machine, replace `ollama` with the value of `OLLAMA_DZ23_GATEWAY_KEY` and bind Ollama only to a trusted network interface protected by firewall/TLS.
+
+API prefixes follow the OpenAI client convention: Gemini uses `/v1beta/openai/chat/completions`, without an extra `/v1`. The Gemini sample uses `gemini-flash-latest`; model availability remains account-dependent. Provider errors in native chat are returned as a single safe Ollama error string.

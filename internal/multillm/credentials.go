@@ -17,7 +17,7 @@ func credentialValue(envName string) string {
 	}
 	path := strings.TrimSpace(os.Getenv(envName + "_FILE"))
 	if path == "" {
-		return ""
+		path, _ = managedCredentialPath(envName)
 	}
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() || info.Size() > maxCredentialFileBytes || !credentialFilePermissionsSafe(info) {

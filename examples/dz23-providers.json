@@ -30,7 +30,7 @@
       "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
       "priority": 80,
       "models": [
-        { "id": "gemini-2.5-flash", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+        { "id": "gemini-flash-latest", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
       ]
     },
     {

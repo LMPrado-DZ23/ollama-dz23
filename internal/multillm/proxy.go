@@ -295,7 +295,19 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return writeBufferedProviderResponse(c, resp)
+		// Native Ollama clients require an error string, not arbitrary vendor
+		// arrays/HTML. Do not echo upstream bodies that can contain credentials.
+		message := "provider request failed"
+		switch resp.StatusCode {
+		case 401, 403:
+			message = "provider rejected the API key or account permissions"
+		case 404, 410:
+			message = "provider endpoint or model is unavailable"
+		case 429:
+			message = "provider rate limit or account quota exceeded"
+		}
+		c.JSON(resp.StatusCode, gin.H{"error": fmt.Sprintf("%s: %s (HTTP %d)", provider.Name, message, resp.StatusCode)})
+		return nil
 	}
 	if stream {
 		c.Header("Content-Type", "application/x-ndjson")
@@ -338,7 +350,10 @@ func (g *Gateway) doProviderRequest(c *gin.Context, provider Provider, path stri
 	if err != nil {
 		return nil, err
 	}
-	if strings.HasSuffix(base.Path, "/v1") && strings.HasPrefix(path, "/v1/") {
+	// A configured API prefix replaces the public OpenAI /v1 prefix. This
+	// includes /v1/, Gemini /v1beta/openai, and vendor /compatible-mode/v1.
+	// Retain /v1 only for a bare host with no configured API prefix.
+	if strings.Trim(base.Path, "/") != "" && strings.HasPrefix(path, "/v1/") {
 		path = strings.TrimPrefix(path, "/v1")
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/" + strings.TrimLeft(path, "/")

@@ -33,6 +33,7 @@ import (
 	ollamaAuth "github.com/ollama/ollama/auth"
 	"github.com/ollama/ollama/cmd/launch"
 	"github.com/ollama/ollama/envconfig"
+	"github.com/ollama/ollama/internal/multillm"
 	"github.com/ollama/ollama/manifest"
 	"github.com/ollama/ollama/types/model"
 	_ "github.com/tkrajina/typescriptify-golang-structs/typescriptify"
@@ -280,6 +281,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("OPTIONS /", handle(func(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}))
+
+	mux.Handle("/api/v1/dz23/providers", multillm.DesktopCredentialsHandler(s.Token))
 
 	// API routes - handle first to take precedence
 	mux.Handle("GET /api/v1/chats", handle(s.listChats))
