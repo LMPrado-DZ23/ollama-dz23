@@ -84,7 +84,7 @@
     },
     {
       "name": "nvidia", "type": "openai-compatible", "base_url": "https://integrate.api.nvidia.com/v1", "api_key_env": "NVIDIA_API_KEY", "priority": 55,
-      "models": [{ "id": "meta/llama-3.1-8b-instruct", "capabilities": ["chat", "coding"] }]
+      "models": [{ "id": "nvidia/nemotron-3.5-lightning-30b-a3b", "capabilities": ["chat", "coding"] }]
     },
     {
       "name": "novita", "type": "openai-compatible", "base_url": "https://api.novita.ai/openai/v1", "api_key_env": "NOVITA_API_KEY", "priority": 50,
