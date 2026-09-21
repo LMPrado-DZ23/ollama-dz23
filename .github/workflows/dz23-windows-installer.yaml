@@ -20,6 +20,31 @@ permissions:
   contents: read
 
 jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build Desktop UI
+        working-directory: app/ui/app
+        run: |
+          npm ci
+          npm run build
+      - name: Test Desktop HTTP routing
+        run: go test ./app/ui -run TestProviderRoutesRegisterAndRequireAuthentication -count=1
+      - name: Build Desktop executable
+        run: go build -trimpath -ldflags "-s -w -H windowsgui -X=github.com/ollama/ollama/app/version.Version=0.1.1-dz23" -o dist/windows-ollama-app-amd64.exe ./app/cmd/app/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OllamaDZ23Desktop-windows-amd64-unsigned
+          path: dist/windows-ollama-app-amd64.exe
   installer:
     runs-on: windows-latest
     timeout-minutes: 90

@@ -282,7 +282,10 @@ func (s *Server) Handler() http.Handler {
 		return nil
 	}))
 
-	mux.Handle("/api/v1/dz23/providers", multillm.DesktopCredentialsHandler(s.Token))
+	providers := multillm.DesktopCredentialsHandler(s.Token)
+	for _, method := range []string{"GET", "PUT", "DELETE"} {
+		mux.Handle(method+" /api/v1/dz23/providers", providers)
+	}
 
 	// API routes - handle first to take precedence
 	mux.Handle("GET /api/v1/chats", handle(s.listChats))
