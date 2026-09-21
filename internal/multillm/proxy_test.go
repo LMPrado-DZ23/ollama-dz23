@@ -332,3 +332,96 @@ func TestAnthropicProviderTranslatesNativeChat(t *testing.T) {
 		t.Fatalf("status=%d path=%q model=%q system=%q body=%s", recorder.Code, gotPath, gotModel, gotSystem, recorder.Body.String())
 	}
 }
+
+func TestProviderBaseURLPrefixes(t *testing.T) {
+	for _, tc := range []struct{ prefix, want string }{
+		{"", "/v1/chat/completions"},
+		{"/v1", "/v1/chat/completions"},
+		{"/v1/", "/v1/chat/completions"},
+		{"/v1beta/openai", "/v1beta/openai/chat/completions"},
+		{"/v1beta/openai/", "/v1beta/openai/chat/completions"},
+		{"/compatible-mode/v1", "/compatible-mode/v1/chat/completions"},
+		{"/api/v1", "/api/v1/chat/completions"},
+	} {
+		t.Run(tc.prefix, func(t *testing.T) {
+			var got string
+			upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r.URL.Path; w.Write([]byte(`{}`)) }))
+			defer upstream.Close()
+			g := NewGateway(&Registry{}, upstream.Client())
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/api/chat", nil)
+			resp, err := g.doProviderRequest(c, Provider{BaseURL: upstream.URL + tc.prefix, AllowPrivate: true}, "/v1/chat/completions", []byte(`{}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if got != tc.want {
+				t.Fatalf("path=%q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNativeProviderErrorIsSafeOllamaJSON(t *testing.T) {
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		w.Write([]byte("[{\n\"secret\":\"do-not-echo\"}]"))
+	}))
+	defer upstream.Close()
+	g := NewGateway(&Registry{}, upstream.Client())
+	rr := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rr)
+	c.Request = httptest.NewRequest("POST", "/api/chat", nil)
+	err := g.forwardNative(c, Provider{Name: "gemini", BaseURL: upstream.URL + "/v1beta/openai", AllowPrivate: true}, Model{ID: "gemini/test", UpstreamID: "test"}, map[string]json.RawMessage{"messages": json.RawMessage(`[]`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if rr.Code != 404 || !strings.Contains(result["error"], "gemini") || strings.Contains(rr.Body.String(), "do-not-echo") {
+		t.Fatalf("unsafe error %s", rr.Body.String())
+	}
+}
+
+func TestNativeGenerationOptionsReachProvider(t *testing.T) {
+	for _, path := range []string{"/api/chat", "/api/generate"} {
+		for _, limit := range []string{"32", "-1"} {
+			t.Run(path+limit, func(t *testing.T) {
+				var got map[string]json.RawMessage
+				upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+						t.Error(err)
+					}
+					w.Header().Set("Retry-After", "30")
+					w.WriteHeader(http.StatusTooManyRequests)
+				}))
+				defer upstream.Close()
+				g := NewGateway(&Registry{}, upstream.Client())
+				rr := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rr)
+				c.Request = httptest.NewRequest("POST", path, nil)
+				err := g.forwardNative(c, Provider{Name: "test", BaseURL: upstream.URL, AllowPrivate: true}, Model{UpstreamID: "test"}, map[string]json.RawMessage{
+					"messages": json.RawMessage(`[]`),
+					"options":  json.RawMessage(`{"num_predict":` + limit + `,"temperature":0,"top_p":0.8,"seed":42,"stop":["END"]}`),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if limit == "32" && string(got["max_tokens"]) != "32" {
+					t.Fatalf("token cap lost: %s", got["max_tokens"])
+				}
+				if limit == "-1" && got["max_tokens"] != nil {
+					t.Fatal("unlimited token setting forwarded as negative cap")
+				}
+				if string(got["temperature"]) != "0" || string(got["top_p"]) != "0.8" || string(got["seed"]) != "42" || string(got["stop"]) != `["END"]` {
+					t.Fatalf("options lost: %v", got)
+				}
+				if rr.Code != 429 || rr.Header().Get("Retry-After") != "30" {
+					t.Fatal("upstream throttle status/header lost")
+				}
+			})
+		}
+	}
+}

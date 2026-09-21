@@ -5,6 +5,10 @@ import { Settings as SettingsType } from "@/gotypes";
 import { Badge } from "./ui/badge";
 import Settings from "./Settings";
 
+vi.mock("@/components/ProviderSettings", () => ({
+  ProviderSettings: () => <section aria-label="Provider settings" />,
+}));
+
 const mocks = vi.hoisted(() => ({
   resetClaudeMappings: vi.fn(),
   resetChatGPTModels: vi.fn(),

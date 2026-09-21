@@ -22,6 +22,20 @@ import (
 	"github.com/ollama/ollama/cmd/launch"
 )
 
+func TestProviderRoutesRegisterAndRequireAuthentication(t *testing.T) {
+	s := &Server{Token: "desktop-test-token"}
+	h := s.Handler() // Must not panic on a conflict with OPTIONS or SPA routes.
+	for _, method := range []string{"GET", "PUT", "DELETE"} {
+		r := httptest.NewRequest(method, "/api/v1/dz23/providers", nil)
+		r.RemoteAddr = "127.0.0.1:12345"
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden && w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s without token: got %d", method, w.Code)
+		}
+	}
+}
+
 func TestHandlePostApiSettings(t *testing.T) {
 	tests := []struct {
 		name      string

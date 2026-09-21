@@ -113,7 +113,11 @@ Source: ".\assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\examples\dz23-providers.json"; DestDir: "{userappdata}\Ollama DZ23"; DestName: "dz23-providers.json"; Flags: onlyifdoesntexist
 Source: "..\scripts\dz23-configure.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
+[Tasks]
+Name: "autostart"; Description: "Iniciar Ollama DZ23 ao entrar no Windows"; Flags: checkedonce
+
 [Icons]
+Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart; IconFilename: "{app}\app.ico"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
 Name: "{app}\lib\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
 Name: "{userprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
@@ -133,7 +137,8 @@ Type: filesandordirs; Name: "{userstartup}\{#MyAppName}.lnk"
 ; Shared Ollama models, history, and official-app data are always preserved.
 
 [InstallDelete]
-Type: filesandordirs; Name: "{app}\lib\ollama"
+; CPU-only updates must not delete separately installed GPU runtimes.
+Type: files; Name: "{app}\lib\ollama\*"
 
 [Messages]
 WizardReady=Ollama
@@ -173,11 +178,38 @@ begin
   Result := Pos(';' + ExpandConstant(Param) + ';', ';' + OrigPath + ';') = 0;
 end;
 
+function PowerShellLiteral(Value: String): String;
+begin
+  StringChangeEx(Value, #39, #39 + #39, True);
+  Result := #39 + Value + #39;
+end;
+
 procedure TaskKill(FileName: String);
 var
   ResultCode: Integer;
+  Command: String;
 begin
-    { Stop only processes installed under this fork's directory. Image-wide
-      taskkill would also terminate an official Ollama installation. }
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith(''''' + ExpandConstant('{app}') + '\'''',[System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Stop the app, server, and orphaned model runners before replacing DLLs.
+    The trailing separator prevents matching another installation directory. }
+  Command := '$ErrorActionPreference = ' + PowerShellLiteral('Stop') +
+    '; Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith(' +
+    PowerShellLiteral(ExpandConstant('{app}') + '\') +
+    ', [System.StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force';
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -Command "' + Command + '"', '',
+    SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    RaiseException('Could not stop the running Ollama DZ23 process. Close it and retry.');
+  if ResultCode <> 0 then
+    RaiseException('Could not stop the running Ollama DZ23 process. Close it and retry.');
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  try
+    TaskKill('{#MyAppExeName}');
+    TaskKill('ollama.exe');
+  except
+    Result := GetExceptionMessage;
+  end;
 end;

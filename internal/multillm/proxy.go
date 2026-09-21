@@ -260,6 +260,28 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 	request := make(map[string]any)
 	request["model"] = model.UpstreamID
 	request["stream"] = stream
+	// Preserve explicit Ollama generation limits when translating to Chat
+	// Completions. Negative num_predict values mean unlimited, not a token cap.
+	var options map[string]json.RawMessage
+	if raw := envelope["options"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &options); err != nil {
+			return errors.New("invalid generation options")
+		}
+		var limit int
+		if raw := options["num_predict"]; len(raw) > 0 {
+			if err := json.Unmarshal(raw, &limit); err != nil {
+				return errors.New("invalid generation token limit")
+			}
+			if limit > 0 {
+				request["max_tokens"] = limit
+			}
+		}
+		for _, field := range []string{"temperature", "top_p", "seed", "stop"} {
+			if raw := options[field]; len(raw) > 0 {
+				request[field] = raw
+			}
+		}
+	}
 	if c.Request.URL.Path == "/api/generate" {
 		var prompt, system string
 		_ = json.Unmarshal(envelope["prompt"], &prompt)
@@ -295,7 +317,22 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return writeBufferedProviderResponse(c, resp)
+		// Native Ollama clients require an error string, not arbitrary vendor
+		// arrays/HTML. Do not echo upstream bodies that can contain credentials.
+		message := "provider request failed"
+		switch resp.StatusCode {
+		case 401, 403:
+			message = "provider rejected the API key or account permissions"
+		case 404, 410:
+			message = "provider endpoint or model is unavailable"
+		case 429:
+			message = "provider rate limit or account quota exceeded"
+		}
+		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+			c.Header("Retry-After", retryAfter)
+		}
+		c.JSON(resp.StatusCode, gin.H{"error": fmt.Sprintf("%s: %s (HTTP %d)", provider.Name, message, resp.StatusCode)})
+		return nil
 	}
 	if stream {
 		c.Header("Content-Type", "application/x-ndjson")
@@ -338,7 +375,10 @@ func (g *Gateway) doProviderRequest(c *gin.Context, provider Provider, path stri
 	if err != nil {
 		return nil, err
 	}
-	if strings.HasSuffix(base.Path, "/v1") && strings.HasPrefix(path, "/v1/") {
+	// A configured API prefix replaces the public OpenAI /v1 prefix. This
+	// includes /v1/, Gemini /v1beta/openai, and vendor /compatible-mode/v1.
+	// Retain /v1 only for a bare host with no configured API prefix.
+	if strings.Trim(base.Path, "/") != "" && strings.HasPrefix(path, "/v1/") {
 		path = strings.TrimPrefix(path, "/v1")
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/" + strings.TrimLeft(path, "/")

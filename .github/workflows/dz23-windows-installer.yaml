@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feat/dz23-multi-provider-foundation
+      - fix/windows-provider-settings
     paths:
       - 'app/**'
       - 'cmd/**'
@@ -19,6 +20,37 @@ permissions:
   contents: read
 
 jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build Desktop UI
+        working-directory: app/ui/app
+        run: |
+          npm ci
+          npm run build
+      - name: Test Desktop HTTP routing
+        run: go test ./app/ui -run TestProviderRoutesRegisterAndRequireAuthentication -count=1
+      - name: Build Desktop executable
+        run: go build -trimpath -ldflags "-s -w -H windowsgui -X=github.com/ollama/ollama/app/version.Version=0.1.1-dz23" -o dist/windows-ollama-app-amd64.exe ./app/cmd/app/
+      - name: Test and build gateway executable
+        run: |
+          go test ./internal/multillm -count=1
+          go build -trimpath -ldflags "-s -w -X=github.com/ollama/ollama/version.Version=0.1.1-dz23" -o dist/ollama.exe .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OllamaDZ23Desktop-windows-amd64-unsigned
+          path: |
+            dist/windows-ollama-app-amd64.exe
+            dist/ollama.exe
   installer:
     runs-on: windows-latest
     timeout-minutes: 90
@@ -36,7 +68,7 @@ jobs:
       - name: Build CPU runtime, Desktop, and installer
         shell: pwsh
         env:
-          VERSION: 0.1.0-dz23
+          VERSION: 0.1.1-dz23
         run: ./scripts/build_windows.ps1 cpu ollama app installer
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4

@@ -17,3 +17,7 @@ func decodeCredentialFile(path string, raw []byte) (string, error) {
 	}
 	return string(raw), nil
 }
+
+func encodeCredentialFile(value string) ([]byte, error) { return []byte(value), nil }
+
+const managedCredentialExtension = ".key"

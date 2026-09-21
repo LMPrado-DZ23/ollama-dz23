@@ -30,7 +30,7 @@
       "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
       "priority": 80,
       "models": [
-        { "id": "gemini-2.5-flash", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+        { "id": "gemini-flash-latest", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
       ]
     },
     {
@@ -56,7 +56,7 @@
     },
     {
       "name": "groq", "type": "openai-compatible", "base_url": "https://api.groq.com/openai/v1", "api_key_env": "GROQ_API_KEY", "priority": 75,
-      "models": [{ "id": "llama-3.1-8b-instant", "capabilities": ["chat", "tools", "coding"] }]
+      "models": [{ "id": "openai/gpt-oss-20b", "capabilities": ["chat", "tools", "coding"] }]
     },
     {
       "name": "together", "type": "openai-compatible", "base_url": "https://api.together.xyz/v1", "api_key_env": "TOGETHER_API_KEY", "priority": 55,
@@ -84,7 +84,7 @@
     },
     {
       "name": "nvidia", "type": "openai-compatible", "base_url": "https://integrate.api.nvidia.com/v1", "api_key_env": "NVIDIA_API_KEY", "priority": 55,
-      "models": [{ "id": "meta/llama-3.1-8b-instruct", "capabilities": ["chat", "coding"] }]
+      "models": [{ "id": "nvidia/nemotron-3.5-lightning-30b-a3b", "capabilities": ["chat", "coding"] }]
     },
     {
       "name": "novita", "type": "openai-compatible", "base_url": "https://api.novita.ai/openai/v1", "api_key_env": "NOVITA_API_KEY", "priority": 50,
