@@ -953,6 +953,18 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
+	pcEnabled := req.FileTools != nil && *req.FileTools
+	if pcEnabled {
+		if !slices.Contains(details.Capabilities, model.CapabilityTools) {
+			return fmt.Errorf("selecione um modelo com suporte a ferramentas para acessar o PC")
+		}
+		closeMCP, err := tools.RegisterMCP(ctx, registry)
+		if err != nil {
+			return err
+		}
+		defer closeMCP()
+	}
+
 	var thinkingTimeStart *time.Time = nil
 	var thinkingTimeEnd *time.Time = nil
 	// Request-only assistant tool_calls buffer
@@ -1296,6 +1308,9 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		passNum++
+		if pcEnabled && passNum > 12 {
+			return fmt.Errorf("limite de etapas do Desktop Commander atingido; envie uma nova mensagem para continuar")
+		}
 	}
 
 	// handle cases where thinking started but didn't finish
@@ -1892,7 +1907,7 @@ func (s *Server) buildChatRequest(chat *store.Chat, model string, think any, ava
 				for _, tc := range m.ToolCalls {
 					var args api.ToolCallFunctionArguments
 					if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-						s.log().Error("failed to parse tool call arguments", "error", err, "function_name", tc.Function.Name, "arguments", tc.Function.Arguments)
+						s.log().Error("failed to parse tool call arguments", "error", err, "function_name", tc.Function.Name)
 						continue
 					}
 

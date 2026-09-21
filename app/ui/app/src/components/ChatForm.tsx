@@ -104,6 +104,7 @@ function ChatForm({
   const thinkButtonRef = useRef<HTMLButtonElement>(null);
   const thinkingLevelButtonRef = useRef<HTMLButtonElement>(null);
   const webSearchButtonRef = useRef<HTMLButtonElement>(null);
+  const [pcToolsEnabled, setPcToolsEnabled] = useState(false);
   const modelPickerRef = useRef<HTMLButtonElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -503,6 +504,7 @@ function ChatForm({
         attachments: attachmentsToSend,
         index: undefined,
         webSearch: useWebSearch,
+        fileTools: pcToolsEnabled && supportsWebSearch,
         think: useThink,
       });
     } else {
@@ -510,6 +512,7 @@ function ChatForm({
         message: message.content,
         attachments: attachmentsToSend,
         webSearch: useWebSearch,
+        fileTools: pcToolsEnabled && supportsWebSearch,
         think: useThink,
         onChatEvent: (event) => {
           if (event.eventName === "chat_created" && event.chatId) {
@@ -925,6 +928,16 @@ function ChatForm({
                     />
                   </>
                 )}
+                <button
+                  type="button"
+                  aria-pressed={pcToolsEnabled}
+                  disabled={!supportsWebSearch}
+                  title={supportsWebSearch ? "Conectar ferramentas do Desktop Commander. Cada ação pede confirmação." : "Escolha um modelo com suporte a ferramentas"}
+                  onClick={() => setPcToolsEnabled((value) => !value)}
+                  className={`rounded-lg px-2 py-1 text-xs disabled:opacity-40 ${pcToolsEnabled ? "bg-neutral-900 text-white dark:bg-white dark:text-black" : "text-neutral-600 dark:text-neutral-300"}`}
+                >
+                  {pcToolsEnabled ? "Acesso ao PC ativado" : "Acessar PC"}
+                </button>
                 <WebSearchButton
                   ref={webSearchButtonRef}
                   isVisible={supportsWebSearch && cloudDisabled === false}
