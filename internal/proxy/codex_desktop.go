@@ -175,6 +175,11 @@ func (h *CodexDesktop) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeStatus(w)
 		return
 	}
+	// Desktop and CLI releases use both Responses URL forms. Normalize before
+	// routing, auto-review, compaction and activity accounting.
+	if suffix == "/responses" || strings.HasPrefix(suffix, "/responses/") {
+		suffix = "/v1" + suffix
+	}
 	started := time.Now()
 	if isWebSocketUpgrade(r) {
 		// Codex treats 426 as a session-wide fallback to HTTP, which allows per-request routing.
@@ -390,7 +395,7 @@ func (h *CodexDesktop) modifyResponse(resp *http.Response) error {
 			h.chatGPTRequests.Add(1)
 		}
 	}
-	if state.routed {
+	if state.routed && resp.Header.Get("X-Ollama-DZ23-Provider") == "" {
 		if err := h.rewriteAccessErrors(resp); err != nil {
 			return err
 		}

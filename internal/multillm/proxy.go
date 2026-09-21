@@ -83,10 +83,22 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 			return
 		}
 		if registered, exists := g.registry.Model(requested); exists && !registered.Available {
+			if c.Request.URL.Path == "/v1/responses" {
+				c.Header("X-Ollama-DZ23-Provider", registered.Provider)
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "Provider " + registered.Provider + " has no available credential or is disabled. Configure it in Ollama Settings > Provedores de IA.", "type": "invalid_request_error", "code": "provider_not_configured"}})
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "model provider is configured but unavailable"})
 			return
 		}
 		model, ok := g.registry.Resolve(requested, Policy{Path: c.Request.URL.Path})
+		if !ok && c.Request.URL.Path == "/v1/responses" {
+			if _, chatOK := g.registry.Resolve(requested, Policy{Path: "/api/chat"}); chatOK {
+				// Continue through Responses parsing, then the native-chat bridge.
+				c.Next()
+				return
+			}
+		}
 		if !ok {
 			if strings.HasPrefix(requested, "auto/") || requested == "auto" {
 				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "no available provider satisfies the routing policy"})
@@ -104,6 +116,7 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "configured provider is unavailable"})
 			return
 		}
+		c.Header("X-Ollama-DZ23-Provider", provider.Name)
 		if !provider.SupportsPath(c.Request.URL.Path) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "provider does not support this API path"})
 			return
