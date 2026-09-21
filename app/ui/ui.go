@@ -1907,7 +1907,7 @@ func (s *Server) buildChatRequest(chat *store.Chat, model string, think any, ava
 				for _, tc := range m.ToolCalls {
 					var args api.ToolCallFunctionArguments
 					if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-						s.log().Error("failed to parse tool call arguments", "error", err, "function_name", tc.Function.Name, "arguments", tc.Function.Arguments)
+						s.log().Error("failed to parse tool call arguments", "error", err, "function_name", tc.Function.Name)
 						continue
 					}
 

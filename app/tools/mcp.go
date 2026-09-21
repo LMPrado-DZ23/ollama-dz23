@@ -18,6 +18,7 @@ type mcpTool struct {
 	spec    *mcp.Tool
 	session *mcpbridge.Session
 	budget  *mcpBudget
+	approve func(string, string) bool
 }
 type mcpBudget struct {
 	mu    sync.Mutex
@@ -55,7 +56,7 @@ func (t *mcpTool) Execute(ctx context.Context, args map[string]any) (any, string
 	if len(raw) > 12000 {
 		return nil, "", errors.New("divida esta operação: argumentos grandes demais para revisão")
 	}
-	if !confirmMCP(t.spec.Name, string(raw)) {
+	if t.approve == nil || !t.approve(t.spec.Name, string(raw)) {
 		return nil, "", errors.New("o usuário não autorizou esta operação; não tente novamente")
 	}
 	if err := ctx.Err(); err != nil {
@@ -82,7 +83,7 @@ func RegisterMCP(ctx context.Context, registry *Registry) (func(), error) {
 	}
 	budget := &mcpBudget{}
 	for _, spec := range session.Tools() {
-		registry.Register(&mcpTool{spec: spec, session: session, budget: budget})
+		registry.Register(&mcpTool{spec: spec, session: session, budget: budget, approve: confirmMCP})
 	}
 	return func() { _ = session.Close() }, nil
 }
