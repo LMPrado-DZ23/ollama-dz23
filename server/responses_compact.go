@@ -170,6 +170,7 @@ func (s *Server) runResponsesCompactionInference(c *gin.Context, body []byte) *r
 	router.POST("/v1/responses",
 		cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable),
 		middleware.ResponsesMiddleware(),
+		s.responsesProviderMiddleware(),
 		s.ChatHandler,
 	)
 
@@ -177,6 +178,7 @@ func (s *Server) runResponsesCompactionInference(c *gin.Context, body []byte) *r
 	if err != nil {
 		return &responsesInferenceRecorder{header: make(http.Header), status: http.StatusInternalServerError, body: *bytes.NewBufferString(err.Error())}
 	}
+	req.RemoteAddr = c.Request.RemoteAddr
 	req.Header = c.Request.Header.Clone()
 	req.Header.Del("Content-Encoding")
 	req.Header.Set("Content-Type", "application/json")
