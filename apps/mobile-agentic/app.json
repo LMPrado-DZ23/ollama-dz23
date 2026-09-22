@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "DZ23 Agentic",
+    "slug": "dz23-agentic",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "dz23-agentic",
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": { "fallbackToCacheTimeout": 0 },
+    "plugins": ["expo-secure-store", ["expo-notifications", { "color": "#171717" }]],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lmprado.dz23agentic",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.lmprado.dz23agentic",
+      "versionCode": 1,
+      "permissions": ["POST_NOTIFICATIONS"],
+      "adaptiveIcon": { "backgroundColor": "#111111" }
+    },
+    "web": { "bundler": "metro" }
+  }
+}

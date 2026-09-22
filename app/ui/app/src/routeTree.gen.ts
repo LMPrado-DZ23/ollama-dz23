@@ -14,6 +14,7 @@ import { Route as rootRoute } from './routes/__root'
 import { Route as SettingsImport } from './routes/settings'
 import { Route as OnboardingImport } from './routes/onboarding'
 import { Route as ConnectImport } from './routes/connect'
+import { Route as AgenticImport } from './routes/agentic'
 import { Route as IndexImport } from './routes/index'
 import { Route as CChatIdImport } from './routes/c.$chatId'
 
@@ -34,6 +35,12 @@ const OnboardingRoute = OnboardingImport.update({
 const ConnectRoute = ConnectImport.update({
   id: '/connect',
   path: '/connect',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AgenticRoute = AgenticImport.update({
+  id: '/agentic',
+  path: '/agentic',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -58,6 +65,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/agentic': {
+      id: '/agentic'
+      path: '/agentic'
+      fullPath: '/agentic'
+      preLoaderRoute: typeof AgenticImport
       parentRoute: typeof rootRoute
     }
     '/connect': {
@@ -95,6 +109,7 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agentic': typeof AgenticRoute
   '/connect': typeof ConnectRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
@@ -103,6 +118,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agentic': typeof AgenticRoute
   '/connect': typeof ConnectRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
@@ -112,6 +128,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/agentic': typeof AgenticRoute
   '/connect': typeof ConnectRoute
   '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
@@ -120,15 +137,29 @@ export interface FileRoutesById {
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connect' | '/onboarding' | '/settings' | '/c/$chatId'
+  fullPaths:
+    | '/'
+    | '/agentic'
+    | '/connect'
+    | '/onboarding'
+    | '/settings'
+    | '/c/$chatId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connect' | '/onboarding' | '/settings' | '/c/$chatId'
-  id: '__root__' | '/' | '/connect' | '/onboarding' | '/settings' | '/c/$chatId'
+  to: '/' | '/agentic' | '/connect' | '/onboarding' | '/settings' | '/c/$chatId'
+  id:
+    | '__root__'
+    | '/'
+    | '/agentic'
+    | '/connect'
+    | '/onboarding'
+    | '/settings'
+    | '/c/$chatId'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgenticRoute: typeof AgenticRoute
   ConnectRoute: typeof ConnectRoute
   OnboardingRoute: typeof OnboardingRoute
   SettingsRoute: typeof SettingsRoute
@@ -137,6 +168,7 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgenticRoute: AgenticRoute,
   ConnectRoute: ConnectRoute,
   OnboardingRoute: OnboardingRoute,
   SettingsRoute: SettingsRoute,
@@ -154,6 +186,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/agentic",
         "/connect",
         "/onboarding",
         "/settings",
@@ -162,6 +195,9 @@ export const routeTree = rootRoute
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/agentic": {
+      "filePath": "agentic.tsx"
     },
     "/connect": {
       "filePath": "connect.tsx"

@@ -13,16 +13,18 @@ import (
 // LaunchModel is the model metadata Launch passes to integration config
 // writers after resolving selected model names through the per-run inventory.
 type LaunchModel struct {
-	Name            string
-	Remote          bool
-	ToolCapable     bool
-	Capabilities    []modelpkg.Capability
-	Thinking        *api.ModelRecommendationThinking
-	ContextLength   int
-	MaxOutputTokens int
-	EmbeddingLength int
-	Size            int64
-	Details         api.ModelDetails
+	Name              string
+	Remote            bool
+	External          bool
+	ExternalAvailable bool
+	ToolCapable       bool
+	Capabilities      []modelpkg.Capability
+	Thinking          *api.ModelRecommendationThinking
+	ContextLength     int
+	MaxOutputTokens   int
+	EmbeddingLength   int
+	Size              int64
+	Details           api.ModelDetails
 }
 
 type modelInfo = LaunchModel
@@ -135,14 +137,16 @@ func resolveLaunchModels(names []string, models []LaunchModel) ([]LaunchModel, b
 
 func launchModelFromListResponse(model api.ListModelResponse) LaunchModel {
 	return LaunchModel{
-		Name:            model.Name,
-		Remote:          model.RemoteModel != "",
-		ToolCapable:     slices.Contains(model.Capabilities, modelpkg.CapabilityTools),
-		Capabilities:    append([]modelpkg.Capability(nil), model.Capabilities...),
-		ContextLength:   model.Details.ContextLength,
-		EmbeddingLength: model.Details.EmbeddingLength,
-		Size:            model.Size,
-		Details:         model.Details,
+		Name:              model.Name,
+		Remote:            model.RemoteModel != "" || model.RemoteHost != "" || model.Details.Format == "remote",
+		External:          model.Details.Format == "remote" && model.RemoteModel == "" && model.RemoteHost == "",
+		ExternalAvailable: !strings.HasSuffix(strings.ToLower(strings.TrimSpace(model.Details.Family)), "-unavailable"),
+		ToolCapable:       slices.Contains(model.Capabilities, modelpkg.CapabilityTools),
+		Capabilities:      append([]modelpkg.Capability(nil), model.Capabilities...),
+		ContextLength:     model.Details.ContextLength,
+		EmbeddingLength:   model.Details.EmbeddingLength,
+		Size:              model.Size,
+		Details:           model.Details,
 	}.WithCloudLimits()
 }
 

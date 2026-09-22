@@ -811,6 +811,8 @@ func newClaudeDesktopAccessError(model ClaudeDesktopModel, access ClaudeDesktopM
 		status = http.StatusUnauthorized
 	case ClaudeDesktopAccessModelNotInstalled:
 		status = http.StatusNotFound
+	case ClaudeDesktopAccessProviderUnavailable:
+		status = http.StatusServiceUnavailable
 	case ClaudeDesktopAccessVerificationUnavailable:
 		status = http.StatusServiceUnavailable
 	}
@@ -827,6 +829,8 @@ func (e *claudeDesktopAccessError) Error() string {
 		return fmt.Sprintf("%s requires an Ollama %s plan.", e.model, e.access.RequiredPlan)
 	case ClaudeDesktopAccessModelNotInstalled:
 		return fmt.Sprintf("%s is not installed in Ollama.", e.model)
+	case ClaudeDesktopAccessProviderUnavailable:
+		return fmt.Sprintf("The DZ23 provider for %s is unavailable. Configure its credential and try again.", e.model)
 	default:
 		return "Ollama could not verify access to this model. Try again."
 	}

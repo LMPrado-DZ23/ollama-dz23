@@ -524,3 +524,21 @@ func TestDefaultClaudeDesktopMappingsOnlyUseAvailableModels(t *testing.T) {
 		t.Fatalf("partial catalog defaults = %v, want %v", got, want)
 	}
 }
+
+func TestClaudeDesktopModelsFromDZ23Inventory(t *testing.T) {
+	models := ClaudeDesktopModelsFromDZ23Inventory([]api.ListModelResponse{
+		{Name: "openai/gpt-test", Details: api.ModelDetails{Format: "remote", Family: "openai"}},
+		{Name: "anthropic/claude-test", Details: api.ModelDetails{Format: "remote", Family: "anthropic-unavailable"}},
+		{Name: "ollama-cloud-model", RemoteModel: "ollama-cloud-model", Details: api.ModelDetails{Format: "remote", Family: "cloud"}},
+		{Name: "local-model", Details: api.ModelDetails{Format: "gguf", Family: "llama"}},
+	})
+	if len(models) != 2 {
+		t.Fatalf("models = %#v, want two DZ23 models", models)
+	}
+	if models[0].GatewayID() != "claude-fable-5" || !models[0].External || !models[0].ExternalAvailable {
+		t.Fatalf("available external model = %#v", models[0])
+	}
+	if !models[1].External || models[1].ExternalAvailable {
+		t.Fatalf("unavailable external model = %#v", models[1])
+	}
+}

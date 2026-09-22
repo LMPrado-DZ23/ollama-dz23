@@ -1,0 +1,48 @@
+name: dz23-multi-provider
+
+on:
+  push:
+    branches:
+      - feat/dz23-multi-provider-foundation
+  pull_request:
+    paths:
+      - 'internal/multillm/**'
+      - 'app/ui/**'
+      - 'server/routes.go'
+      - 'server/dz23_multi_provider_test.go'
+      - 'examples/dz23-providers.json'
+      - '.github/workflows/dz23-multi-provider.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify formatting
+        shell: bash
+        run: test -z "$(gofmt -l internal/multillm app/ui/responses/types.go server/dz23_multi_provider_test.go server/routes.go)"
+      - name: Test multi-provider contracts
+        shell: bash
+        run: |
+          go test ./internal/multillm -count=1
+          go test ./server -run 'TestDZ23' -count=1
+      - name: Build Ollama
+        run: go build .
+      - name: Test and build Desktop UI
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: app/ui/app
+        run: |
+          npm ci
+          npm test -- --run src/api.test.ts src/components/ModelPicker.test.ts
+          npm run build

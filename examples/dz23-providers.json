@@ -1,0 +1,114 @@
+{
+  "providers": [
+    {
+      "name": "openai",
+      "type": "openai-compatible",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "paths": ["/v1/messages", "/v1/chat/completions", "/v1/completions", "/v1/responses", "/v1/embeddings", "/api/chat", "/api/generate"],
+      "priority": 100,
+      "models": [
+        { "id": "gpt-4.1-mini", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "anthropic",
+      "type": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "paths": ["/v1/messages", "/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 90,
+      "models": [
+        { "id": "claude-sonnet-4-5", "capabilities": ["chat", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "gemini",
+      "type": "openai-compatible",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "api_key_env": "GEMINI_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 80,
+      "models": [
+        { "id": "gemini-2.5-flash", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "deepseek",
+      "type": "openai-compatible",
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 70,
+      "models": [
+        { "id": "deepseek-chat", "capabilities": ["chat", "tools"], "priority": 20 },
+        { "id": "deepseek-reasoner", "capabilities": ["chat", "reasoning"], "priority": 30 }
+      ]
+    },
+    {
+      "name": "openrouter",
+      "type": "openai-compatible",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 60,
+      "models": [{ "id": "openrouter/free", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "groq", "type": "openai-compatible", "base_url": "https://api.groq.com/openai/v1", "api_key_env": "GROQ_API_KEY", "priority": 75,
+      "models": [{ "id": "llama-3.1-8b-instant", "capabilities": ["chat", "tools", "coding"] }]
+    },
+    {
+      "name": "together", "type": "openai-compatible", "base_url": "https://api.together.xyz/v1", "api_key_env": "TOGETHER_API_KEY", "priority": 55,
+      "models": [{ "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "fireworks", "type": "openai-compatible", "base_url": "https://api.fireworks.ai/inference/v1", "api_key_env": "FIREWORKS_API_KEY", "priority": 55,
+      "models": [{ "id": "accounts/fireworks/models/llama-v3p1-8b-instruct", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "cerebras", "type": "openai-compatible", "base_url": "https://api.cerebras.ai/v1", "api_key_env": "CEREBRAS_API_KEY", "priority": 60,
+      "models": [{ "id": "llama3.1-8b", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "mistral", "type": "openai-compatible", "base_url": "https://api.mistral.ai/v1", "api_key_env": "MISTRAL_API_KEY", "priority": 70,
+      "models": [{ "id": "mistral-small-latest", "capabilities": ["chat", "tools", "coding"] }]
+    },
+    {
+      "name": "xai", "type": "openai-compatible", "base_url": "https://api.x.ai/v1", "api_key_env": "XAI_API_KEY", "priority": 70,
+      "models": [{ "id": "grok-3-mini", "capabilities": ["chat", "reasoning", "coding"] }]
+    },
+    {
+      "name": "sambanova", "type": "openai-compatible", "base_url": "https://api.sambanova.ai/v1", "api_key_env": "SAMBANOVA_API_KEY", "priority": 55,
+      "models": [{ "id": "Meta-Llama-3.1-8B-Instruct", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "nvidia", "type": "openai-compatible", "base_url": "https://integrate.api.nvidia.com/v1", "api_key_env": "NVIDIA_API_KEY", "priority": 55,
+      "models": [{ "id": "meta/llama-3.1-8b-instruct", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "novita", "type": "openai-compatible", "base_url": "https://api.novita.ai/openai/v1", "api_key_env": "NOVITA_API_KEY", "priority": 50,
+      "models": [{ "id": "meta-llama/llama-3.1-8b-instruct", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "upstage", "type": "openai-compatible", "base_url": "https://api.upstage.ai/v1/solar", "api_key_env": "UPSTAGE_API_KEY", "priority": 50,
+      "models": [{ "id": "solar-pro2", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "ollama-cloud", "type": "openai-compatible", "base_url": "https://ollama.com/v1", "api_key_env": "OLLAMA_API_KEY", "priority": 65,
+      "models": [{ "id": "gpt-oss:20b", "capabilities": ["chat", "tools", "reasoning", "coding"] }]
+    },
+    {
+      "name": "hyperbolic", "type": "openai-compatible", "base_url": "https://api.hyperbolic.xyz/v1", "api_key_env": "HYPERBOLIC_API_KEY", "priority": 50,
+      "models": [{ "id": "meta-llama/Meta-Llama-3.1-8B-Instruct", "capabilities": ["chat", "coding"] }]
+    },
+    {
+      "name": "alibaba", "type": "openai-compatible", "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "api_key_env": "ALIBABA_API_KEY", "priority": 65,
+      "models": [{ "id": "qwen-turbo", "capabilities": ["chat", "tools", "coding"] }]
+    },
+    {
+      "name": "huggingface", "type": "openai-compatible", "base_url": "https://router.huggingface.co/v1", "api_key_env": "HUGGINGFACE_TOKEN", "priority": 45,
+      "models": [{ "id": "deepseek-ai/DeepSeek-R1:fastest", "capabilities": ["chat", "reasoning", "coding"] }]
+    }
+  ]
+}

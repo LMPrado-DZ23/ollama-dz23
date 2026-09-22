@@ -65,3 +65,18 @@ func TestEvaluateClaudeDesktopModelAccessUnknownCloudEntitlement(t *testing.T) {
 		t.Fatalf("EvaluateClaudeDesktopModelAccess() = %+v, want %+v", got, want)
 	}
 }
+
+func TestEvaluateClaudeDesktopExternalProviderAccess(t *testing.T) {
+	available := newClaudeDesktopModel("openai/gpt-test", "", "", 0)
+	available.External = true
+	available.ExternalAvailable = true
+	if got := EvaluateClaudeDesktopModelAccess(available, ClaudeDesktopAccessState{}, false, false); got.Availability != ClaudeDesktopAvailabilityAvailable {
+		t.Fatalf("available external model = %+v", got)
+	}
+	unavailable := available
+	unavailable.ExternalAvailable = false
+	want := ClaudeDesktopModelAccess{Availability: ClaudeDesktopAvailabilityUnavailable, Reason: ClaudeDesktopAccessProviderUnavailable}
+	if got := EvaluateClaudeDesktopModelAccess(unavailable, ClaudeDesktopAccessState{}, false, false); got != want {
+		t.Fatalf("unavailable external model = %+v, want %+v", got, want)
+	}
+}

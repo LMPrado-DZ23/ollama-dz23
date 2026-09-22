@@ -43,6 +43,7 @@ const (
 	ClaudeDesktopAccessUpgradeRequired         ClaudeDesktopAccessReason = "upgrade_required"
 	ClaudeDesktopAccessVerificationUnavailable ClaudeDesktopAccessReason = "verification_unavailable"
 	ClaudeDesktopAccessModelNotInstalled       ClaudeDesktopAccessReason = "model_not_installed"
+	ClaudeDesktopAccessProviderUnavailable     ClaudeDesktopAccessReason = "provider_unavailable"
 )
 
 // ClaudeDesktopModelAccess is the policy decision for one model.
@@ -57,6 +58,15 @@ type ClaudeDesktopModelAccess struct {
 // models.
 func EvaluateClaudeDesktopModelAccess(model ClaudeDesktopModel, state ClaudeDesktopAccessState, installed, inventoryKnown bool) ClaudeDesktopModelAccess {
 	decision := ClaudeDesktopModelAccess{RequiredPlan: strings.TrimSpace(model.RequiredPlan)}
+	if model.External {
+		if model.ExternalAvailable {
+			decision.Availability = ClaudeDesktopAvailabilityAvailable
+			return decision
+		}
+		decision.Availability = ClaudeDesktopAvailabilityUnavailable
+		decision.Reason = ClaudeDesktopAccessProviderUnavailable
+		return decision
+	}
 	if !model.Cloud {
 		if !inventoryKnown {
 			decision.Availability = ClaudeDesktopAvailabilityUnknown

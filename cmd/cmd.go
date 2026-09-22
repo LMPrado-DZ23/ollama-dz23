@@ -2655,6 +2655,7 @@ func NewCLI() *cobra.Command {
 		deleteCmd,
 		runnerCmd,
 		gpuDiscoverCmd,
+		agentCommand(),
 		launch.LaunchCmd(checkServerHeartbeat, runInteractiveTUI),
 	)
 

@@ -78,3 +78,24 @@ func TestModelInventoryResolveDoesNotRefreshCloudMiss(t *testing.T) {
 		t.Fatalf("cloud limits not applied: %#v", got[0])
 	}
 }
+
+func TestModelInventoryMarksDZ23RemoteModelsAsRemote(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/tags" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `{"models":[{"name":"openai/gpt-test","details":{"format":"remote","family":"openai"},"capabilities":["tools","coding"]}]}`)
+	}))
+	defer srv.Close()
+
+	u, _ := url.Parse(srv.URL)
+	inventory := newModelInventory(api.NewClient(u, srv.Client()))
+	models, err := inventory.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 1 || !models[0].Remote || !models[0].External || !models[0].ExternalAvailable || !models[0].ToolCapable {
+		t.Fatalf("models = %#v, want one remote tool-capable model", models)
+	}
+}

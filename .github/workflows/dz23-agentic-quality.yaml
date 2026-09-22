@@ -1,0 +1,102 @@
+name: dz23-agentic-quality
+
+on:
+  pull_request:
+    paths:
+      - 'internal/agent/**'
+      - 'server/agent_routes.go'
+      - 'server/companion_ws.go'
+      - 'app/ui/app/**'
+      - 'apps/mobile-agentic/**'
+      - 'deploy/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/dz23-agentic-quality.yaml'
+  push:
+    branches:
+      - 'feat/**'
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  go-agentic:
+    name: Go agentic and server gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go mod verify
+      - run: gofmt -l internal/agent server/companion_ws.go server/agent_routes.go | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
+      - run: CGO_ENABLED=0 go test ./internal/agent -count=1
+      - run: CGO_ENABLED=1 go test ./server -count=1
+      - run: CGO_ENABLED=1 go build -o dist/ollama-agentic .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ollama-agentic-linux
+          path: dist/ollama-agentic
+
+  distributed-integration:
+    name: PostgreSQL RLS, Redis DLQ and OTLP integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start distributed dependencies
+        run: docker compose -f deploy/docker-compose.agentic.yml up -d --wait
+      - name: Run integration tests
+        env:
+          OLLAMA_AGENT_TEST_POSTGRES_URL: postgres://ollama_agent:change-me-local-only@127.0.0.1:5432/ollama_agent?sslmode=disable
+          OLLAMA_AGENT_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+          OLLAMA_AGENT_TEST_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
+          OLLAMA_AGENT_OTLP_ALLOW_INSECURE: '1'
+        run: CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
+      - name: Dump dependency logs on failure
+        if: failure()
+        run: docker compose -f deploy/docker-compose.agentic.yml logs --no-color
+      - name: Stop distributed dependencies
+        if: always()
+        run: docker compose -f deploy/docker-compose.agentic.yml down -v
+
+  web-and-mobile:
+    name: Web and mobile typechecks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile-agentic/package-lock.json
+      - name: Mobile typecheck
+        working-directory: apps/mobile-agentic
+        run: npm ci --no-audit --no-fund && npm run typecheck
+      - name: Web dependency install
+        working-directory: app/ui/app
+        run: npm install --no-audit --no-fund
+      - name: Web typecheck
+        working-directory: app/ui/app
+        run: ./node_modules/.bin/tsc --noEmit
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-cyclonedx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dz23-sbom
+          path: sbom-cyclonedx.json

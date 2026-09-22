@@ -1,0 +1,47 @@
+name: dz23-windows-installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/dz23-multi-provider-foundation
+    paths:
+      - 'app/**'
+      - 'cmd/**'
+      - 'internal/multillm/**'
+      - 'server/**'
+      - 'scripts/build_windows.ps1'
+      - 'scripts/dz23-configure.ps1'
+      - 'examples/dz23-providers.json'
+      - '.github/workflows/dz23-windows-installer.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/ui/app/package-lock.json
+      - name: Build CPU runtime, Desktop, and installer
+        shell: pwsh
+        env:
+          VERSION: 0.1.0-dz23
+        run: ./scripts/build_windows.ps1 cpu ollama app installer
+      - name: Upload unsigned installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OllamaDZ23Setup-windows-amd64-unsigned
+          path: dist/OllamaDZ23Setup.exe
+          if-no-files-found: error
+          retention-days: 30

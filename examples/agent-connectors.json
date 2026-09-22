@@ -1,0 +1,52 @@
+[
+  {
+    "id": "github",
+    "provider": "github",
+    "base_url": "https://api.github.com",
+    "token_env": "DZ23_GITHUB_TOKEN",
+    "operations": [
+      { "name": "list_repositories", "methods": ["GET"], "path_prefixes": ["/user/repos"] },
+      { "name": "read_repository", "methods": ["GET"], "path_prefixes": ["/repos/"] },
+      { "name": "create_issue_comment", "methods": ["POST"], "path_prefixes": ["/repos/"] }
+    ]
+  },
+  {
+    "id": "google",
+    "provider": "google-workspace",
+    "base_url": "https://www.googleapis.com",
+    "token_env": "DZ23_GOOGLE_TOKEN",
+    "operations": [
+      { "name": "drive_list", "methods": ["GET"], "path_prefixes": ["/drive/v3/files"] },
+      { "name": "calendar_list", "methods": ["GET"], "path_prefixes": ["/calendar/v3/calendars"] }
+    ]
+  },
+  {
+    "id": "slack",
+    "provider": "slack",
+    "base_url": "https://slack.com/api",
+    "token_env": "DZ23_SLACK_TOKEN",
+    "operations": [
+      { "name": "list_channels", "methods": ["GET"], "path_prefixes": ["/conversations.list"] },
+      { "name": "post_message", "methods": ["POST"], "path_prefixes": ["/chat.postMessage"] }
+    ]
+  },
+  {
+    "id": "discord",
+    "provider": "discord",
+    "base_url": "https://discord.com/api/v10",
+    "token_env": "DZ23_DISCORD_TOKEN",
+    "operations": [
+      { "name": "read_channel", "methods": ["GET"], "path_prefixes": ["/channels/"] },
+      { "name": "send_message", "methods": ["POST"], "path_prefixes": ["/channels/"] }
+    ]
+  },
+  {
+    "id": "whatsapp",
+    "provider": "whatsapp-cloud",
+    "base_url": "https://graph.facebook.com/v20.0",
+    "token_env": "DZ23_WHATSAPP_TOKEN",
+    "operations": [
+      { "name": "send_message", "methods": ["POST"], "path_prefixes": ["/"] }
+    ]
+  }
+]

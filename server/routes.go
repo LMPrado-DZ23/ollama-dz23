@@ -37,7 +37,9 @@ import (
 	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/format"
 	"github.com/ollama/ollama/fs/gguf"
+	"github.com/ollama/ollama/internal/agent"
 	internalcloud "github.com/ollama/ollama/internal/cloud"
+	"github.com/ollama/ollama/internal/multillm"
 	"github.com/ollama/ollama/internal/proxy"
 	"github.com/ollama/ollama/llm"
 	"github.com/ollama/ollama/logutil"
@@ -100,6 +102,9 @@ type Server struct {
 	defaultNumCtx int
 	requestLogger *inferenceRequestLogger
 	modelCaches   *modelCaches
+	multiProvider *multillm.Gateway
+	multiRegistry *multillm.Registry
+	agentRuntime  *agent.Runtime
 }
 
 func init() {
@@ -1349,6 +1354,38 @@ func (s *Server) ShowHandler(c *gin.Context) {
 		return
 	}
 	requestedModel := req.Model
+	if s.multiRegistry != nil {
+		if remote, ok := s.multiRegistry.Model(requestedModel); ok {
+			caps := make([]model.Capability, 0, len(remote.Capabilities))
+			for _, capability := range remote.Capabilities {
+				caps = append(caps, model.Capability(capability))
+			}
+			family := remote.Provider
+			if !remote.Available {
+				family += "-unavailable"
+			}
+			c.JSON(http.StatusOK, api.ShowResponse{
+				Details: api.ModelDetails{Format: "remote", Family: family}, Capabilities: caps,
+				ModelInfo: map[string]any{"general.basename": requestedModel, "dz23.provider": remote.Provider},
+			})
+			return
+		}
+		if strings.HasPrefix(requestedModel, "auto/") || requestedModel == "auto" || requestedModel == "local/private" {
+			resolvedModel, resolved := s.multiRegistry.Resolve(requestedModel, multillm.Policy{})
+			localConfigured := requestedModel == "local/private" && strings.TrimSpace(os.Getenv("OLLAMA_DZ23_LOCAL_MODEL")) != ""
+			if resolved || localConfigured {
+				caps := make([]model.Capability, 0, len(resolvedModel.Capabilities))
+				for _, capability := range resolvedModel.Capabilities {
+					caps = append(caps, model.Capability(capability))
+				}
+				c.JSON(http.StatusOK, api.ShowResponse{
+					Details: api.ModelDetails{Format: "virtual", Family: "dz23-router"}, Capabilities: caps,
+					ModelInfo: map[string]any{"general.basename": requestedModel},
+				})
+				return
+			}
+		}
+	}
 
 	modelRef, err := parseAndValidateModelRef(req.Model)
 	if err != nil {
@@ -1670,6 +1707,31 @@ func (s *Server) ListHandler(c *gin.Context) {
 		return
 	}
 
+	if s.multiRegistry != nil {
+		for _, remote := range s.multiRegistry.Models() {
+			caps := make([]model.Capability, 0, len(remote.Capabilities))
+			for _, capability := range remote.Capabilities {
+				caps = append(caps, model.Capability(capability))
+			}
+			family := remote.Provider
+			if !remote.Available {
+				family += "-unavailable"
+			}
+			models = append(models, api.ListModelResponse{
+				Name: remote.ID, Model: remote.ID, Digest: "remote:" + remote.Provider,
+				Details:      api.ModelDetails{Format: "remote", Family: family},
+				Capabilities: caps,
+			})
+		}
+		if strings.TrimSpace(os.Getenv("OLLAMA_DZ23_LOCAL_MODEL")) != "" {
+			models = append(models, api.ListModelResponse{Name: "local/private", Model: "local/private", Digest: "virtual:local", Details: api.ModelDetails{Format: "virtual", Family: "ollama-local"}})
+		}
+		for _, alias := range []string{"auto/coding", "auto/reasoning", "auto/vision"} {
+			if _, ok := s.multiRegistry.Resolve(alias, multillm.Policy{}); ok {
+				models = append(models, api.ListModelResponse{Name: alias, Model: alias, Digest: "virtual:dz23", Details: api.ModelDetails{Format: "virtual", Family: "dz23-router"}})
+			}
+		}
+	}
 	c.JSON(http.StatusOK, api.ListResponse{Models: models})
 }
 
@@ -1850,6 +1912,13 @@ func allowedHostsMiddleware(addr net.Addr) gin.HandlerFunc {
 }
 
 func (s *Server) GenerateRoutes() (http.Handler, error) {
+	if s.agentRuntime == nil {
+		runtime, err := newDefaultAgentRuntime()
+		if err != nil {
+			return nil, err
+		}
+		s.agentRuntime = runtime
+	}
 	codexDesktopProxy, err := newCodexDesktopProxy()
 	if err != nil {
 		return nil, err
@@ -1888,6 +1957,15 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 		cors.New(corsConfig),
 		allowedHostsMiddleware(s.addr),
 	)
+	if configPath := strings.TrimSpace(os.Getenv("OLLAMA_DZ23_CONFIG")); configPath != "" {
+		registry, err := multillm.Load(configPath)
+		if err != nil {
+			return nil, err
+		}
+		s.multiRegistry = registry
+		s.multiProvider = multillm.NewGateway(registry, nil)
+		r.Use(s.multiProvider.Middleware())
+	}
 
 	// General
 	r.HEAD("/", func(c *gin.Context) { c.String(http.StatusOK, "Ollama is running") })
@@ -1895,6 +1973,14 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.HEAD("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.GET("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.GET("/api/status", s.StatusHandler)
+	r.GET("/api/dz23/cli-catalog", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"tools": multillm.DetectCLIs()})
+	})
+	agentAPI, err := newAgentAPI(s.agentRuntime)
+	if err != nil {
+		return nil, err
+	}
+	agentAPI.register(r)
 	// Codex uses this existing Ollama listener for both native and Ollama
 	// models. The proxy selects the upstream per request.
 	r.Any(proxy.CodexDesktopPathPrefix+"/*path", gin.WrapH(codexDesktopProxy))
@@ -2026,6 +2112,7 @@ func Serve(ln net.Listener) error {
 	schedCtx, schedDone := context.WithCancel(ctx)
 	sched := InitScheduler(schedCtx)
 	s.sched = sched
+	s.agentRuntime.Start(ctx)
 	s.modelCaches.Start(ctx)
 
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))
@@ -2039,6 +2126,10 @@ func Serve(ln net.Listener) error {
 		// and easy way to get pprof, but it may not be the best
 		// way.
 		Handler: nil,
+	}
+	secureAgentServer, err := configureAgentTLS(srvr)
+	if err != nil {
+		return err
 	}
 
 	// listen for a ctrl+c and stop any loaded llm
@@ -2080,7 +2171,11 @@ func Serve(ln net.Listener) error {
 	}
 	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "default_num_ctx", s.defaultNumCtx)
 
-	err = srvr.Serve(ln)
+	if secureAgentServer {
+		err = srvr.ServeTLS(ln, "", "")
+	} else {
+		err = srvr.Serve(ln)
+	}
 	// If server is closed from the signal handler, wait for the ctx to be done
 	// otherwise error out quickly
 	if !errors.Is(err, http.ErrServerClosed) {

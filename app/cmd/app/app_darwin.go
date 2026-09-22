@@ -117,6 +117,7 @@ var (
 
 	claudeAccessStateResolver = currentClaudeDesktopAccessState
 	claudeLocalModelsResolver = currentClaudeDesktopLocalModels
+	claudeDZ23ModelsResolver  = currentClaudeDesktopDZ23Models
 )
 
 var errClaudeDesktopAccessUnavailable = errors.New("Ollama couldn't verify the selected models. Try again")
@@ -662,6 +663,12 @@ func resolveClaudeDesktopStartupCatalog(ctx context.Context) (available, selecte
 	}
 	available, source = claudeModelsLoader(ctx)
 	selectable := available
+	if external, err := claudeDZ23ModelsResolver(ctx); err != nil {
+		slog.Debug("could not load DZ23 provider models for Claude startup", "error", err)
+	} else {
+		available = includeSelectedClaudeDesktopModels(available, external)
+		selectable = available
+	}
 	state, err := claudeAccessStateResolver(ctx)
 	if err == nil && state.Cloud == proxy.ClaudeDesktopCloudOn {
 		cloudModels, err := claudeCloudModelsResolver(ctx)
@@ -720,6 +727,11 @@ func allClaudeDesktopModelsLocal(selected, installed []string) bool {
 
 func resolveClaudeDesktopCatalog(ctx context.Context) (available, selected []proxy.ClaudeDesktopModel, source string) {
 	available, source = claudeModelsLoader(ctx)
+	if external, err := claudeDZ23ModelsResolver(ctx); err != nil {
+		slog.Debug("could not load DZ23 provider models for Claude catalog", "error", err)
+	} else {
+		available = includeSelectedClaudeDesktopModels(available, external)
+	}
 	selected = configuredClaudeDesktopModels(available, nil)
 	if len(selected) == 0 {
 		selected = available
@@ -757,6 +769,11 @@ func refreshClaudeDesktopCatalog(ctx context.Context, current []proxy.ClaudeDesk
 			}
 			available = proxy.WithoutClaudeDesktopRecommendationMappings(available)
 			current = proxy.WithoutClaudeDesktopRecommendationMappings(current)
+		}
+		if external, err := claudeDZ23ModelsResolver(ctx); err != nil {
+			slog.Debug("could not refresh DZ23 provider models for Claude", "error", err)
+		} else {
+			available = includeSelectedClaudeDesktopModels(available, external)
 		}
 		state, err := claudeAccessStateResolver(ctx)
 		if err == nil && state.Cloud == proxy.ClaudeDesktopCloudOn {
@@ -1040,6 +1057,17 @@ func currentClaudeDesktopLocalModels(ctx context.Context) ([]string, error) {
 	return claudeLocalModels(ctx, client.List)
 }
 
+func currentClaudeDesktopDZ23Models(ctx context.Context) ([]proxy.ClaudeDesktopModel, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	client := api.NewClient(envconfig.ConnectableHost(), http.DefaultClient)
+	response, err := client.List(ctx)
+	if err != nil || response == nil {
+		return nil, err
+	}
+	return proxy.ClaudeDesktopModelsFromDZ23Inventory(response.Models), nil
+}
+
 func ensureClaudeDesktopModelsAvailable(ctx context.Context, models []proxy.ClaudeDesktopModel) error {
 	deadline := time.Now().Add(claudeAccessRetryWait)
 	for {
@@ -1107,6 +1135,9 @@ func validateClaudeDesktopModels(models []proxy.ClaudeDesktopModel, state proxy.
 	}
 	if _, ok := reasons[proxy.ClaudeDesktopAccessModelNotInstalled]; ok {
 		return errors.New("Install the selected model or choose another model in Ollama Settings")
+	}
+	if _, ok := reasons[proxy.ClaudeDesktopAccessProviderUnavailable]; ok {
+		return errors.New("Configure the selected DZ23 provider credential or choose another model in Ollama Settings")
 	}
 	if _, ok := reasons[proxy.ClaudeDesktopAccessVerificationUnavailable]; ok {
 		return errClaudeDesktopAccessUnavailable

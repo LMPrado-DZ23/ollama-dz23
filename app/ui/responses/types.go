@@ -26,9 +26,13 @@ type ChatResponse struct {
 }
 
 type Model struct {
-	Model      string     `json:"model"`
-	Digest     string     `json:"digest,omitempty"`
-	ModifiedAt *time.Time `json:"modified_at,omitempty"`
+	Model        string     `json:"model"`
+	Digest       string     `json:"digest,omitempty"`
+	ModifiedAt   *time.Time `json:"modified_at,omitempty"`
+	Kind         string     `json:"kind,omitempty"`
+	Provider     string     `json:"provider,omitempty"`
+	Available    bool       `json:"available"`
+	Capabilities []string   `json:"capabilities,omitempty"`
 }
 
 type ModelsResponse struct {

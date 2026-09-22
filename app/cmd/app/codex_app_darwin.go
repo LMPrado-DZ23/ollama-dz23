@@ -581,8 +581,9 @@ func buildCodexDesktopModelInventory(
 	catalog = append(catalog, extras...)
 	available := make([]launch.LaunchModel, 0, len(catalog))
 	for _, entry := range catalog {
-		// Recommendations remain configurable regardless of current availability.
-		if entry.Recommended || entry.Availability == proxy.ClaudeDesktopAvailabilityAvailable {
+		// Recommendations and explicitly configured DZ23 providers remain visible
+		// even when a credential is currently unavailable.
+		if entry.Recommended || entry.Availability == proxy.ClaudeDesktopAvailabilityAvailable || codexDesktopDZ23Model(entry.Model) {
 			available = append(available, entry.Model)
 		}
 	}
@@ -661,6 +662,12 @@ func codexDesktopInventoryModelAccess(
 	access proxy.ClaudeDesktopAccessState,
 	accessKnown, cloudInventoryKnown bool,
 ) (proxy.ClaudeDesktopAvailability, proxy.ClaudeDesktopAccessReason) {
+	if codexDesktopDZ23Model(model) {
+		if codexDesktopDZ23ProviderAvailable(model) {
+			return proxy.ClaudeDesktopAvailabilityAvailable, ""
+		}
+		return proxy.ClaudeDesktopAvailabilityUnavailable, proxy.ClaudeDesktopAccessProviderUnavailable
+	}
 	if !model.Remote {
 		return proxy.ClaudeDesktopAvailabilityAvailable, ""
 	}
@@ -955,13 +962,15 @@ func codexDesktopLaunchModel(model api.ListModelResponse) launch.LaunchModel {
 		name = strings.TrimSpace(model.Model)
 	}
 	return launch.LaunchModel{
-		Name:            name,
-		Remote:          model.RemoteModel != "" || model.RemoteHost != "" || codexDesktopCloudModel(name),
-		Capabilities:    append([]modelpkg.Capability(nil), model.Capabilities...),
-		ContextLength:   model.Details.ContextLength,
-		EmbeddingLength: model.Details.EmbeddingLength,
-		Size:            model.Size,
-		Details:         model.Details,
+		Name:              name,
+		Remote:            model.RemoteModel != "" || model.RemoteHost != "" || model.Details.Format == "remote" || codexDesktopCloudModel(name),
+		External:          model.Details.Format == "remote" && model.RemoteModel == "" && model.RemoteHost == "",
+		ExternalAvailable: !strings.HasSuffix(strings.ToLower(strings.TrimSpace(model.Details.Family)), "-unavailable"),
+		Capabilities:      append([]modelpkg.Capability(nil), model.Capabilities...),
+		ContextLength:     model.Details.ContextLength,
+		EmbeddingLength:   model.Details.EmbeddingLength,
+		Size:              model.Size,
+		Details:           model.Details,
 	}
 }
 
@@ -981,6 +990,14 @@ func codexDesktopModelKey(name string) string {
 func codexDesktopCloudModel(name string) bool {
 	name = strings.ToLower(strings.TrimSpace(name))
 	return strings.HasSuffix(name, ":cloud") || strings.HasSuffix(name, "-cloud")
+}
+
+func codexDesktopDZ23Model(model launch.LaunchModel) bool {
+	return model.External
+}
+
+func codexDesktopDZ23ProviderAvailable(model launch.LaunchModel) bool {
+	return model.ExternalAvailable
 }
 
 func hasUsedCodexDesktopIntegration() bool {

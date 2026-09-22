@@ -1,0 +1,25 @@
+[
+  {
+    "id": "vercel-production",
+    "provider": "vercel",
+    "base_url": "https://api.vercel.com",
+    "token_env": "DZ23_VERCEL_TOKEN",
+    "project_id": "",
+    "account_id": "",
+    "timeout_seconds": 120
+  },
+  {
+    "id": "netlify-production",
+    "provider": "netlify",
+    "base_url": "https://api.netlify.com",
+    "token_env": "DZ23_NETLIFY_TOKEN",
+    "timeout_seconds": 120
+  },
+  {
+    "id": "self-hosted-deployer",
+    "provider": "generic",
+    "base_url": "https://deploy.example.com",
+    "token_env": "DZ23_DEPLOY_TOKEN",
+    "timeout_seconds": 120
+  }
+]

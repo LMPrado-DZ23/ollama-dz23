@@ -90,17 +90,19 @@ func resolveClaudeDesktopMappings(available []ClaudeDesktopModel, wanted map[str
 // catalog. Name is the canonical recommendation identifier shown to users;
 // OllamaModel is the explicit route sent to the local Ollama server.
 type ClaudeDesktopModel struct {
-	Name             string
-	Description      string
-	DisplayName      string
-	RequiredPlan     string
-	OllamaModel      string
-	Cloud            bool
-	Recommended      bool
-	AccountCloud     bool
-	entitlementKnown bool
-	defaultMappings  *api.ModelRecommendationMappings
-	gateway          gatewayModel
+	Name              string
+	Description       string
+	DisplayName       string
+	RequiredPlan      string
+	OllamaModel       string
+	Cloud             bool
+	External          bool
+	ExternalAvailable bool
+	Recommended       bool
+	AccountCloud      bool
+	entitlementKnown  bool
+	defaultMappings   *api.ModelRecommendationMappings
+	gateway           gatewayModel
 }
 
 // GatewayID returns the validated Claude-facing ID assigned to this model.
@@ -279,6 +281,42 @@ func ClaudeDesktopModelsFromCloudInventory(names []string) []ClaudeDesktopModel 
 		models = append(models, model)
 	}
 	return models
+}
+
+// ClaudeDesktopModelsFromDZ23Inventory converts the remote models appended by
+// the local DZ23 registry into selectable Claude Desktop routes. These models
+// are neither Ollama Cloud entitlements nor local weights: availability is
+// determined by the provider credential already resolved by the server.
+func ClaudeDesktopModelsFromDZ23Inventory(inventory []api.ListModelResponse) []ClaudeDesktopModel {
+	models := make([]ClaudeDesktopModel, 0, len(inventory))
+	seen := make(map[string]struct{}, len(inventory))
+	for _, item := range inventory {
+		if item.Details.Format != "remote" || item.RemoteModel != "" || item.RemoteHost != "" {
+			continue
+		}
+		name := strings.TrimSpace(item.Name)
+		if name == "" {
+			name = strings.TrimSpace(item.Model)
+		}
+		if !validClaudeDesktopModelName(name) {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		provider := strings.TrimSpace(item.Details.Family)
+		if provider == "" {
+			provider = "DZ23 provider"
+		}
+		available := !strings.HasSuffix(strings.ToLower(provider), "-unavailable")
+		model := newClaudeDesktopModel(name, "DZ23 provider: "+provider, "", 64_000)
+		model.External = true
+		model.ExternalAvailable = available
+		model.entitlementKnown = true
+		models = append(models, model)
+	}
+	return SelectClaudeDesktopModels(models, nil)
 }
 
 // VerifyClaudeDesktopModelsWithCloudInventory marks matching catalog models
